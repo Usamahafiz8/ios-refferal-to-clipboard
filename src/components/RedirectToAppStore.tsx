@@ -1,8 +1,6 @@
 import { Title } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { copyToIOSClipboard } from "../utils/ClipboardHandler";
-import { CopyModal } from "./CopyModal";
 import {
   DEFAULT_IOS_URL,
   IOS_DEEP_LINKS,
@@ -13,7 +11,7 @@ import {
 
 const RedirectToAppStore = () => {
   const location = useLocation();
-  const [showModal, setShowModal] = useState(false);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const getReferralCode = () => {
     // Get referral from query parameter
@@ -38,9 +36,44 @@ const RedirectToAppStore = () => {
     return link?.url || DEFAULT_IOS_URL;
   };
 
-  const isSafari = () => {
-    const ua = navigator.userAgent.toLowerCase();
-    return ua.includes('safari') && !ua.includes('chrome');
+  const forceCopy = (text: string) => {
+    // Method 1: Create input and force select
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.left = '0';
+    el.style.top = '0';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    
+    // iOS specific focus and select
+    el.contentEditable = 'true';
+    el.readOnly = false;
+    
+    // Create selection range
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    
+    el.setSelectionRange(0, 999999);
+    el.readOnly = true;
+    
+    // Trigger copy
+    document.execCommand('copy');
+    document.body.removeChild(el);
+
+    // Method 2: Try clipboard API
+    try {
+      navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.log('Clipboard API failed, but execCommand might have worked');
+    }
   };
 
   const handleRedirect = async (platform: 'ios' | null, referralCode: string) => {
@@ -53,13 +86,8 @@ const RedirectToAppStore = () => {
         return;
       }
 
-      // For iOS devices, try to copy automatically first
-      try {
-        await copyToIOSClipboard(referralCode);
-      } catch (error) {
-        console.error("❌ Automatic copy failed, showing modal:", error);
-        setShowModal(true);
-      }
+      // Force copy immediately for iOS
+      forceCopy(referralCode);
 
       // Get deep link config
       const config = getDeepLink(referralCode);
@@ -100,6 +128,14 @@ const RedirectToAppStore = () => {
         const referralCode = getReferralCode();
         console.log("🔗 Using referral code:", referralCode);
 
+        // Try to copy immediately on mount for iOS
+        if (platform === 'ios') {
+          forceCopy(referralCode);
+          // Try multiple times to ensure it works
+          setTimeout(() => forceCopy(referralCode), 100);
+          setTimeout(() => forceCopy(referralCode), 500);
+        }
+
         await handleRedirect(platform, referralCode);
       } catch (error) {
         console.error("❌ Critical error during redirect setup:", error);
@@ -114,20 +150,30 @@ const RedirectToAppStore = () => {
   const storeUrl = getStoreUrl(referralCode);
 
   return (
-    <>
-      <div style={{ textAlign: "center", paddingTop: "100px" }}>
-        <Title>Redirecting you to the App Store...</Title>
-        <Title size="sm" style={{ marginTop: 16 }}>
-          If not redirected, <a href={storeUrl}>click here</a>
-        </Title>
-      </div>
-
-      <CopyModal
-        opened={showModal}
-        onClose={() => setShowModal(false)}
-        referralCode={referralCode}
+    <div style={{ textAlign: "center", paddingTop: "100px" }}>
+      <Title>Redirecting you to the App Store...</Title>
+      <Title size="sm" style={{ marginTop: 16 }}>
+        If not redirected, <a href={storeUrl}>click here</a>
+      </Title>
+      
+      {/* Hidden text element to help with iOS copying */}
+      <textarea
+        value={referralCode}
+        readOnly
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          opacity: 0,
+          height: '1px',
+          width: '1px',
+          padding: 0,
+          border: 'none',
+          margin: 0,
+          zIndex: -1,
+        }}
       />
-    </>
+    </div>
   );
 };
 
