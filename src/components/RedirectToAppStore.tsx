@@ -48,6 +48,41 @@ const RedirectToAppStore = () => {
     }
   };
 
+  const simulateClick = () => {
+    // Create and dispatch touch events
+    if (inputRef.current) {
+      const element = inputRef.current;
+      
+      // Make input visible and focused
+      element.style.opacity = '1';
+      element.focus();
+      element.select();
+      
+      // Create touch events
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+
+      // Dispatch events
+      element.dispatchEvent(touchStart);
+      element.dispatchEvent(touchEnd);
+      
+      // Also try click event
+      element.click();
+      
+      // Try direct copy
+      handleCopyClick();
+    }
+  };
+
   useEffect(() => {
     const code = getReferralCode();
     setReferralCode(code);
@@ -55,8 +90,13 @@ const RedirectToAppStore = () => {
     const userAgent = navigator.userAgent || navigator.vendor || "";
     const platform = getPlatformFromUserAgent(userAgent);
     
-    // If not iOS, redirect immediately
-    if (platform !== 'ios') {
+    if (platform === 'ios') {
+      // Try multiple times with different delays
+      setTimeout(simulateClick, 100);
+      setTimeout(simulateClick, 500);
+      setTimeout(simulateClick, 1000);
+    } else {
+      // If not iOS, redirect immediately
       window.location.href = getStoreUrl(code);
     }
   }, [location]);
