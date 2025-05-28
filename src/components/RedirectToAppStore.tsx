@@ -53,13 +53,12 @@ const RedirectToAppStore = () => {
         return;
       }
 
-      // For iOS devices, try to copy the referral code
-      if (isSafari()) {
-        // Show modal for Safari users
-        setShowModal(true);
-      } else {
-        // Try automatic copy for non-Safari browsers
+      // For iOS devices, try to copy automatically first
+      try {
         await copyToIOSClipboard(referralCode);
+      } catch (error) {
+        console.error("❌ Automatic copy failed, showing modal:", error);
+        setShowModal(true);
       }
 
       // Get deep link config

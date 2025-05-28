@@ -6,7 +6,31 @@ export const copyToIOSClipboard = async (text: string): Promise<boolean> => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     
     if (isIOS) {
-      await navigator.clipboard.writeText(text);
+      // Try multiple clipboard methods
+      try {
+        // Method 1: Modern Clipboard API
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        // Method 2: Create temporary textarea
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          // Execute copy command
+          document.execCommand('copy');
+          textArea.remove();
+        } catch (err) {
+          textArea.remove();
+          throw new Error('Failed to copy');
+        }
+      }
+
       console.log('📋 Successfully copied to iOS clipboard:', text);
       
       // Show success notification
