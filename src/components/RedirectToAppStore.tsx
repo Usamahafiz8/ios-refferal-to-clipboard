@@ -1,5 +1,5 @@
 import { Title } from "@mantine/core";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import {
   DEFAULT_IOS_URL,
@@ -11,7 +11,6 @@ import {
 
 const RedirectToAppStore = () => {
   const location = useLocation();
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const getReferralCode = () => {
     // Get referral from query parameter
