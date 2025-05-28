@@ -36,41 +36,85 @@ const RedirectToAppStore = () => {
   };
 
   const forceCopy = (text: string) => {
-    // Create input element and add to body
+    // Create input element
     const input = document.createElement('input');
-    input.value = text;
-    input.style.cssText = 'position:fixed;opacity:1;z-index:999999;';
+    input.setAttribute('type', 'text');
+    input.setAttribute('value', text);
+    input.setAttribute('readonly', 'readonly');
+    input.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      z-index: 999999;
+      font-size: 16px;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+    `;
+    
     document.body.appendChild(input);
 
-    // Select the text
-    input.focus();
-    input.select();
-    input.setSelectionRange(0, input.value.length);
+    // Simulate iOS touch/click events
+    const simulateTouch = () => {
+      input.style.opacity = '1';
+      input.style.width = '200px';
+      input.style.height = '40px';
+      input.focus();
+      input.setSelectionRange(0, text.length);
 
-    // Show the input briefly (this helps trigger iOS copy)
-    input.style.opacity = '1';
+      // Create and dispatch touch events
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+
+      input.dispatchEvent(touchStart);
+      input.dispatchEvent(touchEnd);
+
+      // Also try mouse events as fallback
+      const mouseDown = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      const mouseUp = new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+
+      input.dispatchEvent(mouseDown);
+      input.dispatchEvent(mouseUp);
+
+      // Try select and copy command
+      input.select();
+      document.execCommand('selectAll');
+      document.execCommand('copy');
+
+      // Hide after events
+      setTimeout(() => {
+        input.style.opacity = '0';
+        input.style.width = '1px';
+        input.style.height = '1px';
+      }, 100);
+    };
+
+    // Try multiple times with different delays
+    simulateTouch();
+    setTimeout(simulateTouch, 300);
     
-    try {
-      // Try the copy command
-      const success = document.execCommand('copy');
-      if (success) {
-        console.log('Copied successfully using execCommand');
-      }
-    } catch (err) {
-      console.error('execCommand failed:', err);
-    }
-
-    // Also try clipboard API
-    try {
-      navigator.clipboard.writeText(text).then(
-        () => console.log('Clipboard API success'),
-        (err) => console.error('Clipboard API failed:', err)
-      );
-    } catch (err) {
-      console.error('Clipboard API error:', err);
-    }
-
-    // Remove after a short delay
+    // Remove after all attempts
     setTimeout(() => {
       document.body.removeChild(input);
     }, 1000);
@@ -93,8 +137,8 @@ const RedirectToAppStore = () => {
       const config = getDeepLink(referralCode);
       console.log("🔗 Using config:", config);
 
-      // Add a delay before redirect to ensure copy works
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add a longer delay before redirect to ensure copy works
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Check if we're on EC2 or production environment
       const isEC2 =
@@ -133,10 +177,7 @@ const RedirectToAppStore = () => {
 
         // Try to copy immediately on mount for iOS
         if (platform === 'ios') {
-          // Try multiple times with increasing delays
           forceCopy(referralCode);
-          setTimeout(() => forceCopy(referralCode), 300);
-          setTimeout(() => forceCopy(referralCode), 600);
         }
 
         await handleRedirect(platform, referralCode);
@@ -158,26 +199,6 @@ const RedirectToAppStore = () => {
       <Title size="sm" style={{ marginTop: 16 }}>
         If not redirected, <a href={storeUrl}>click here</a>
       </Title>
-      
-      {/* Hidden input for iOS copying */}
-      <input
-        type="text"
-        defaultValue={referralCode}
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          opacity: 0,
-          zIndex: 999999,
-          fontSize: '16px', // Prevents iOS zoom
-          width: '200px',
-          height: '40px',
-          padding: '0',
-          border: 'none',
-          pointerEvents: 'none',
-        }}
-      />
     </div>
   );
 };
