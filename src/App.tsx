@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MantineProvider, Container, Title, Text, Button } from '@mantine/core';
+import { MantineProvider, Container, Title, Text, Button, LoadingOverlay } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,11 +8,14 @@ const DEFAULT_APP_STORE_URL = 'https://apps.apple.com/us/app/baby-einstein-music
 const App = () => {
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
   
   const copyAndRedirect = async () => {
     const referralCode = searchParams.get('ref') || 'default';
     
     try {
+      setLoading(true);
       // Try multiple copy methods
       let copySuccess = false;
       
@@ -53,10 +56,13 @@ const App = () => {
           color: 'green',
         });
         
+        // Set redirecting state before redirect
+        setRedirecting(true);
+        
         // Redirect after a short delay
         setTimeout(() => {
           window.location.href = DEFAULT_APP_STORE_URL;
-        }, 1000);
+        }, 1500);
       } else {
         notifications.show({
           title: 'Manual Copy Required',
@@ -71,21 +77,35 @@ const App = () => {
         message: 'Failed to copy code. Please try manually.',
         color: 'red',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Show content immediately
+    setLoading(false);
+    
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     if (!isIOS) {
-      window.location.href = DEFAULT_APP_STORE_URL;
+      setRedirecting(true);
+      setTimeout(() => {
+        window.location.href = DEFAULT_APP_STORE_URL;
+      }, 500);
       return;
     }
 
-    // Try to copy automatically on mount
+    // Try to copy automatically on mount with delays
     const timeouts = [
-      setTimeout(copyAndRedirect, 500),
-      setTimeout(copyAndRedirect, 1000),
-      setTimeout(copyAndRedirect, 1500)
+      setTimeout(() => {
+        if (!copied && !redirecting) copyAndRedirect();
+      }, 800),
+      setTimeout(() => {
+        if (!copied && !redirecting) copyAndRedirect();
+      }, 1600),
+      setTimeout(() => {
+        if (!copied && !redirecting) copyAndRedirect();
+      }, 2400)
     ];
 
     return () => {
@@ -98,26 +118,54 @@ const App = () => {
   return (
     <MantineProvider>
       <Notifications position="top-center" zIndex={1000} />
-      <Container size="sm" style={{ padding: 20, marginTop: 50, textAlign: 'center' }}>
-        <Title order={1} style={{ marginBottom: 30 }}>
-          {copied ? 'Code Copied!' : 'Copy Referral Code'}
+      <Container size="sm" style={{ 
+        padding: 20, 
+        marginTop: 50, 
+        textAlign: 'center',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        background: '#fff'
+      }}>
+        <LoadingOverlay visible={loading} overlayProps={{ blur: 2 }} />
+        
+        <Title order={1} style={{ marginBottom: 30, color: '#1a1b1e' }}>
+          {redirecting ? 'Redirecting...' : (copied ? 'Code Copied!' : 'Copy Referral Code')}
         </Title>
         
-        <Text size="xl" style={{ marginBottom: 30, padding: 20, background: '#f8f9fa', borderRadius: 8 }}>
+        <Text size="xl" style={{ 
+          marginBottom: 30, 
+          padding: 20, 
+          background: '#f8f9fa', 
+          borderRadius: 8,
+          border: '1px solid #e9ecef',
+          fontWeight: 500
+        }}>
           {referralCode}
         </Text>
         
         <Button
           size="lg"
           fullWidth
-          style={{ maxWidth: 300, margin: '0 auto' }}
+          loading={loading}
+          style={{ 
+            maxWidth: 300, 
+            margin: '0 auto',
+            height: 50,
+            fontSize: 16
+          }}
           onClick={copyAndRedirect}
         >
-          {copied ? 'Continue to App Store' : 'Copy Code & Continue'}
+          {redirecting ? 'Opening App Store...' : (copied ? 'Continue to App Store' : 'Copy Code & Continue')}
         </Button>
         
         <Text size="sm" color="dimmed" style={{ marginTop: 20 }}>
-          {copied ? 'Redirecting to App Store...' : 'Tap the button to copy your referral code'}
+          {redirecting 
+            ? 'Opening the App Store...' 
+            : (copied 
+              ? 'Your code is copied and ready to use' 
+              : 'Tap the button to copy your referral code')}
         </Text>
       </Container>
     </MantineProvider>
