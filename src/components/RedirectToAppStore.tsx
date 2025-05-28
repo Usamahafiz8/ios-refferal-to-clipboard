@@ -36,43 +36,44 @@ const RedirectToAppStore = () => {
   };
 
   const forceCopy = (text: string) => {
-    // Method 1: Create input and force select
-    const el = document.createElement('textarea');
-    el.value = text;
-    el.setAttribute('readonly', '');
-    el.style.position = 'fixed';
-    el.style.left = '0';
-    el.style.top = '0';
-    el.style.opacity = '0';
-    document.body.appendChild(el);
-    
-    // iOS specific focus and select
-    el.contentEditable = 'true';
-    el.readOnly = false;
-    
-    // Create selection range
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    
-    const selection = window.getSelection();
-    if (selection) {
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-    
-    el.setSelectionRange(0, 999999);
-    el.readOnly = true;
-    
-    // Trigger copy
-    document.execCommand('copy');
-    document.body.removeChild(el);
+    // Create input element and add to body
+    const input = document.createElement('input');
+    input.value = text;
+    input.style.cssText = 'position:fixed;opacity:1;z-index:999999;';
+    document.body.appendChild(input);
 
-    // Method 2: Try clipboard API
+    // Select the text
+    input.focus();
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+
+    // Show the input briefly (this helps trigger iOS copy)
+    input.style.opacity = '1';
+    
     try {
-      navigator.clipboard.writeText(text);
-    } catch (e) {
-      console.log('Clipboard API failed, but execCommand might have worked');
+      // Try the copy command
+      const success = document.execCommand('copy');
+      if (success) {
+        console.log('Copied successfully using execCommand');
+      }
+    } catch (err) {
+      console.error('execCommand failed:', err);
     }
+
+    // Also try clipboard API
+    try {
+      navigator.clipboard.writeText(text).then(
+        () => console.log('Clipboard API success'),
+        (err) => console.error('Clipboard API failed:', err)
+      );
+    } catch (err) {
+      console.error('Clipboard API error:', err);
+    }
+
+    // Remove after a short delay
+    setTimeout(() => {
+      document.body.removeChild(input);
+    }, 1000);
   };
 
   const handleRedirect = async (platform: 'ios' | null, referralCode: string) => {
@@ -91,6 +92,9 @@ const RedirectToAppStore = () => {
       // Get deep link config
       const config = getDeepLink(referralCode);
       console.log("🔗 Using config:", config);
+
+      // Add a delay before redirect to ensure copy works
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Check if we're on EC2 or production environment
       const isEC2 =
@@ -129,10 +133,10 @@ const RedirectToAppStore = () => {
 
         // Try to copy immediately on mount for iOS
         if (platform === 'ios') {
+          // Try multiple times with increasing delays
           forceCopy(referralCode);
-          // Try multiple times to ensure it works
-          setTimeout(() => forceCopy(referralCode), 100);
-          setTimeout(() => forceCopy(referralCode), 500);
+          setTimeout(() => forceCopy(referralCode), 300);
+          setTimeout(() => forceCopy(referralCode), 600);
         }
 
         await handleRedirect(platform, referralCode);
@@ -155,21 +159,23 @@ const RedirectToAppStore = () => {
         If not redirected, <a href={storeUrl}>click here</a>
       </Title>
       
-      {/* Hidden text element to help with iOS copying */}
-      <textarea
-        value={referralCode}
-        readOnly
+      {/* Hidden input for iOS copying */}
+      <input
+        type="text"
+        defaultValue={referralCode}
         style={{
           position: 'fixed',
-          left: 0,
-          top: 0,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           opacity: 0,
-          height: '1px',
-          width: '1px',
-          padding: 0,
+          zIndex: 999999,
+          fontSize: '16px', // Prevents iOS zoom
+          width: '200px',
+          height: '40px',
+          padding: '0',
           border: 'none',
-          margin: 0,
-          zIndex: -1,
+          pointerEvents: 'none',
         }}
       />
     </div>
