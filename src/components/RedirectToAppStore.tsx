@@ -1,5 +1,5 @@
-import { Title } from "@mantine/core";
-import { useEffect } from "react";
+import { Title, Button } from "@mantine/core";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
   DEFAULT_IOS_URL,
@@ -11,9 +11,10 @@ import {
 
 const RedirectToAppStore = () => {
   const location = useLocation();
+  const [showCopyButton, setShowCopyButton] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
 
   const getReferralCode = () => {
-    // Get referral from query parameter
     const queryParams = new URLSearchParams(location.search);
     const queryReferral = queryParams.get("ref");
 
@@ -35,89 +36,47 @@ const RedirectToAppStore = () => {
     return link?.url || DEFAULT_IOS_URL;
   };
 
-  const forceCopy = (text: string) => {
-    // Create input element
-    const input = document.createElement('input');
-    input.setAttribute('type', 'text');
-    input.setAttribute('value', text);
-    input.setAttribute('readonly', 'readonly');
-    input.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      opacity: 0;
-      z-index: 999999;
-      font-size: 16px;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      border: 0;
-      outline: 0;
-      background: transparent;
-    `;
-    
-    document.body.appendChild(input);
+  const copyToClipboard = async (text: string) => {
+    try {
+      // Try using Clipboard API first
+      await navigator.clipboard.writeText(text);
+      console.log("✅ Copied using Clipboard API");
+      return true;
+    } catch (err) {
+      console.error("❌ Clipboard API failed:", err);
+      
+      try {
+        // Fallback to execCommand
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "0";
+        textArea.style.top = "0";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const success = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        
+        if (success) {
+          console.log("✅ Copied using execCommand");
+          return true;
+        }
+      } catch (err) {
+        console.error("❌ execCommand failed:", err);
+      }
+      
+      // If both methods fail, show the button
+      setShowCopyButton(true);
+      return false;
+    }
+  };
 
-    // Simulate iOS touch/click events
-    const simulateTouch = () => {
-      input.style.opacity = '1';
-      input.style.width = '200px';
-      input.style.height = '40px';
-      input.focus();
-      input.setSelectionRange(0, text.length);
-
-      // Create and dispatch touch events
-      const touchStart = new TouchEvent('touchstart', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      const touchEnd = new TouchEvent('touchend', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-
-      input.dispatchEvent(touchStart);
-      input.dispatchEvent(touchEnd);
-
-      // Also try mouse events as fallback
-      const mouseDown = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      const mouseUp = new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-
-      input.dispatchEvent(mouseDown);
-      input.dispatchEvent(mouseUp);
-
-      // Try select and copy command
-      input.select();
-      document.execCommand('selectAll');
-      document.execCommand('copy');
-
-      // Hide after events
-      setTimeout(() => {
-        input.style.opacity = '0';
-        input.style.width = '1px';
-        input.style.height = '1px';
-      }, 100);
-    };
-
-    // Try multiple times with different delays
-    simulateTouch();
-    setTimeout(simulateTouch, 300);
-    
-    // Remove after all attempts
-    setTimeout(() => {
-      document.body.removeChild(input);
-    }, 1000);
+  const handleManualCopy = async () => {
+    await copyToClipboard(referralCode);
+    window.location.href = getStoreUrl(referralCode);
   };
 
   const handleRedirect = async (platform: 'ios' | null, referralCode: string) => {
@@ -125,42 +84,41 @@ const RedirectToAppStore = () => {
       if (!platform) {
         console.log("⚠️ Not an iOS device, redirecting to App Store");
         const storeUrl = getStoreUrl(referralCode);
-        console.log("🔄 Redirecting to:", storeUrl);
         window.location.href = storeUrl;
         return;
       }
 
-      // Force copy immediately for iOS
-      forceCopy(referralCode);
+      // Try to copy to clipboard
+      const copySuccess = await copyToClipboard(referralCode);
+      
+      // If copy succeeded, proceed with redirect
+      if (copySuccess) {
+        const config = getDeepLink(referralCode);
+        console.log("🔗 Using config:", config);
 
-      // Get deep link config
-      const config = getDeepLink(referralCode);
-      console.log("🔗 Using config:", config);
+        // Short delay before redirect
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Add a longer delay before redirect to ensure copy works
-      await new Promise(resolve => setTimeout(resolve, 1500));
+        const isEC2 =
+          window.location.hostname.includes("ec2") ||
+          window.location.hostname.includes("amazonaws.com");
 
-      // Check if we're on EC2 or production environment
-      const isEC2 =
-        window.location.hostname.includes("ec2") ||
-        window.location.hostname.includes("amazonaws.com");
+        if (isEC2) {
+          console.log("🖥️ Running on EC2, redirecting to store");
+          window.location.href = getStoreUrl(referralCode);
+          return;
+        }
 
-      if (isEC2) {
-        console.log("🖥️ Running on EC2, skipping app URI redirect");
-        const storeUrl = getStoreUrl(referralCode);
-        console.log("🔄 EC2: Redirecting directly to store:", storeUrl);
-        window.location.href = storeUrl;
-        return;
+        const cleanup = handleIOSRedirect(config);
+        return cleanup;
       }
-
-      // Handle iOS redirect
-      const cleanup = handleIOSRedirect(config);
-      return cleanup;
+      
+      // If copy failed, the button will be shown
+      // Don't redirect automatically
+      
     } catch (error) {
       console.error("❌ Error during redirect:", error);
-      const storeUrl = getStoreUrl(referralCode);
-      console.log("🔄 Error fallback redirect to:", storeUrl);
-      window.location.href = storeUrl;
+      setShowCopyButton(true);
     }
   };
 
@@ -170,35 +128,48 @@ const RedirectToAppStore = () => {
         const userAgent = navigator.userAgent || navigator.vendor || "";
         const platform = getPlatformFromUserAgent(userAgent);
         console.log("📱 Platform:", platform, "User Agent:", userAgent);
-        console.log("🌐 Current hostname:", window.location.hostname);
-
-        const referralCode = getReferralCode();
-        console.log("🔗 Using referral code:", referralCode);
-
-        // Try to copy immediately on mount for iOS
+        
+        const code = getReferralCode();
+        setReferralCode(code);
+        
         if (platform === 'ios') {
-          forceCopy(referralCode);
+          await handleRedirect(platform, code);
+        } else {
+          window.location.href = getStoreUrl(code);
         }
-
-        await handleRedirect(platform, referralCode);
       } catch (error) {
-        console.error("❌ Critical error during redirect setup:", error);
-        window.location.href = DEFAULT_IOS_URL;
+        console.error("❌ Critical error:", error);
+        setShowCopyButton(true);
       }
     };
 
     initializeRedirect();
   }, [location]);
 
-  const referralCode = getReferralCode();
   const storeUrl = getStoreUrl(referralCode);
 
   return (
     <div style={{ textAlign: "center", paddingTop: "100px" }}>
       <Title>Redirecting you to the App Store...</Title>
-      <Title size="sm" style={{ marginTop: 16 }}>
-        If not redirected, <a href={storeUrl}>click here</a>
-      </Title>
+      {showCopyButton ? (
+        <div style={{ marginTop: "20px" }}>
+          <Button
+            size="lg"
+            onClick={handleManualCopy}
+            style={{ marginBottom: "20px" }}
+          >
+            Copy Code & Continue to App Store
+          </Button>
+          <br />
+          <Title size="sm" style={{ marginTop: 16 }}>
+            Or <a href={storeUrl}>continue without copying</a>
+          </Title>
+        </div>
+      ) : (
+        <Title size="sm" style={{ marginTop: 16 }}>
+          If not redirected, <a href={storeUrl}>click here</a>
+        </Title>
+      )}
     </div>
   );
 };
