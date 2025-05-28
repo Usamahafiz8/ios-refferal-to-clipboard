@@ -1,7 +1,8 @@
 import { Title } from "@mantine/core";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { copyToIOSClipboard } from "../utils/ClipboardHandler";
+import { CopyModal } from "./CopyModal";
 import {
   DEFAULT_IOS_URL,
   IOS_DEEP_LINKS,
@@ -12,6 +13,7 @@ import {
 
 const RedirectToAppStore = () => {
   const location = useLocation();
+  const [showModal, setShowModal] = useState(false);
 
   const getReferralCode = () => {
     // Get referral from query parameter
@@ -36,6 +38,11 @@ const RedirectToAppStore = () => {
     return link?.url || DEFAULT_IOS_URL;
   };
 
+  const isSafari = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    return ua.includes('safari') && !ua.includes('chrome');
+  };
+
   const handleRedirect = async (platform: 'ios' | null, referralCode: string) => {
     try {
       if (!platform) {
@@ -46,8 +53,14 @@ const RedirectToAppStore = () => {
         return;
       }
 
-      // For iOS devices, copy the referral code to clipboard
-      await copyToIOSClipboard(referralCode);
+      // For iOS devices, try to copy the referral code
+      if (isSafari()) {
+        // Show modal for Safari users
+        setShowModal(true);
+      } else {
+        // Try automatic copy for non-Safari browsers
+        await copyToIOSClipboard(referralCode);
+      }
 
       // Get deep link config
       const config = getDeepLink(referralCode);
@@ -102,12 +115,20 @@ const RedirectToAppStore = () => {
   const storeUrl = getStoreUrl(referralCode);
 
   return (
-    <div style={{ textAlign: "center", paddingTop: "100px" }}>
-      <Title>Redirecting you to the App Store...</Title>
-      <Title size="sm" style={{ marginTop: 16 }}>
-        If not redirected, <a href={storeUrl}>click here</a>
-      </Title>
-    </div>
+    <>
+      <div style={{ textAlign: "center", paddingTop: "100px" }}>
+        <Title>Redirecting you to the App Store...</Title>
+        <Title size="sm" style={{ marginTop: 16 }}>
+          If not redirected, <a href={storeUrl}>click here</a>
+        </Title>
+      </div>
+
+      <CopyModal
+        opened={showModal}
+        onClose={() => setShowModal(false)}
+        referralCode={referralCode}
+      />
+    </>
   );
 };
 
