@@ -155,7 +155,7 @@ const App = () => {
         }}
         onClick={copyAndRedirect}
       >
-        {redirecting ? 'Opening App Store...' : (copied ? 'Continue to App Store' : 'Copy Code & Continue')}
+        {redirecting ? 'Opening App Store...' : (copied ? 'Continue to App Store' : 'Opening App Store to download')}
       </Button>
       
       <Text size="sm" color="dimmed" style={{ marginTop: 20 }}>
