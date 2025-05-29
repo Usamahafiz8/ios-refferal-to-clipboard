@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { MantineProvider, Container, Title, Text, Button, LoadingOverlay } from '@mantine/core';
-import { Notifications, notifications } from '@mantine/notifications';
+import { Container, Title, Text, Button, LoadingOverlay } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useSearchParams } from 'react-router-dom';
 
 const DEFAULT_APP_STORE_URL = 'https://apps.apple.com/us/app/baby-einstein-music-time/id1640670576';
@@ -116,59 +116,56 @@ const App = () => {
   const referralCode = searchParams.get('ref') || 'default';
 
   return (
-    <MantineProvider>
-      <Notifications position="top-center" zIndex={1000} />
-      <Container size="sm" style={{ 
+    <Container size="sm" style={{ 
+      padding: 20, 
+      marginTop: 50, 
+      textAlign: 'center',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      background: '#fff'
+    }}>
+      <LoadingOverlay visible={loading} overlayProps={{ blur: 2 }} />
+      
+      <Title order={1} style={{ marginBottom: 30, color: '#1a1b1e' }}>
+        {redirecting ? 'Redirecting...' : (copied ? 'Code Copied!' : 'Copy Referral Code')}
+      </Title>
+      
+      <Text size="xl" style={{ 
+        marginBottom: 30, 
         padding: 20, 
-        marginTop: 50, 
-        textAlign: 'center',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        background: '#fff'
+        background: '#f8f9fa', 
+        borderRadius: 8,
+        border: '1px solid #e9ecef',
+        fontWeight: 500
       }}>
-        <LoadingOverlay visible={loading} overlayProps={{ blur: 2 }} />
-        
-        <Title order={1} style={{ marginBottom: 30, color: '#1a1b1e' }}>
-          {redirecting ? 'Redirecting...' : (copied ? 'Code Copied!' : 'Copy Referral Code')}
-        </Title>
-        
-        <Text size="xl" style={{ 
-          marginBottom: 30, 
-          padding: 20, 
-          background: '#f8f9fa', 
-          borderRadius: 8,
-          border: '1px solid #e9ecef',
-          fontWeight: 500
-        }}>
-          {referralCode}
-        </Text>
-        
-        <Button
-          size="lg"
-          fullWidth
-          loading={loading}
-          style={{ 
-            maxWidth: 300, 
-            margin: '0 auto',
-            height: 50,
-            fontSize: 16
-          }}
-          onClick={copyAndRedirect}
-        >
-          {redirecting ? 'Opening App Store...' : (copied ? 'Continue to App Store' : 'Copy Code & Continue')}
-        </Button>
-        
-        <Text size="sm" color="dimmed" style={{ marginTop: 20 }}>
-          {redirecting 
-            ? 'Opening the App Store...' 
-            : (copied 
-              ? 'Your code is copied and ready to use' 
-              : 'Tap the button to copy your referral code')}
-        </Text>
-      </Container>
-    </MantineProvider>
+        {referralCode}
+      </Text>
+      
+      <Button
+        size="lg"
+        fullWidth
+        loading={loading}
+        style={{ 
+          maxWidth: 300, 
+          margin: '0 auto',
+          height: 50,
+          fontSize: 16
+        }}
+        onClick={copyAndRedirect}
+      >
+        {redirecting ? 'Opening App Store...' : (copied ? 'Continue to App Store' : 'Copy Code & Continue')}
+      </Button>
+      
+      <Text size="sm" color="dimmed" style={{ marginTop: 20 }}>
+        {redirecting 
+          ? 'Opening the App Store...' 
+          : (copied 
+            ? 'Your code is copied and ready to use' 
+            : 'Tap the button to copy your referral code')}
+      </Text>
+    </Container>
   );
 };
 
